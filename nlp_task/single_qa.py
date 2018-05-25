@@ -7,215 +7,11 @@ import pickle
 import time
 import sys
 import os
-import nltk
-from nltk.corpus import stopwords
-from nltk.translate.bleu_score import sentence_bleu
-from nltk.translate.bleu_score import SmoothingFunction
-from sklearn.metrics.pairwise import cosine_similarity
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
 from dnc_v2 import DNC
 from recurrent_controller import StatelessRecurrentController
-
+import mimic_processing
 import beam_search
-
-SAMPLED_SOFTMAX=0
-
-def bleu_score(input_batch, target_batch, predict_batch, token2str, print_prob=0.9995):
-    s=[]
-    for b in range(target_batch.shape[0]):
-        trim_target = []
-        trim_predict = []
-        str_target = []
-        str_predict = []
-        str_input=[]
-        for t in target_batch[b]:
-            if t > 2 and token2str[t] != '.':
-                trim_target.append(t)
-                str_target.append(token2str[t])
-        for t in predict_batch[b]:
-            if t > 2 and token2str[t] != '.':
-                trim_predict.append(t)
-                str_predict.append(token2str[t])
-        if np.random.rand()>print_prob:
-            for t in input_batch[b]:
-                if t > 2:
-                    str_input.append(token2str[t])
-            print('{}-->{} vs {}'.format(str_input, str_target, str_predict))
-        try:
-            BLEUscore = sentence_bleu([trim_target], trim_predict,smoothing_function=SmoothingFunction().method7)
-        except:
-            BLEUscore = 0
-        s.append(BLEUscore)
-    return np.mean(s)
-
-def bleu_score4(input_batch, target_batch, predict_batch, token2str, print_prob=0.9995):
-    s1=[]
-    s2=[]
-    s3=[]
-    s4=[]
-    for b in range(target_batch.shape[0]):
-        trim_target = []
-        trim_predict = []
-        str_target = []
-        str_predict = []
-        str_input=[]
-        for t in target_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_target.append(t)
-                str_target.append(token2str[t])
-        for t in predict_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_predict.append(t)
-                str_predict.append(token2str[t])
-        if np.random.rand()>print_prob:
-            for t in input_batch[b]:
-                if t > 2:
-                    str_input.append(token2str[t])
-            print('{}-->{} vs {}'.format(str_input, str_target, str_predict))
-        try:
-            BLEUscore1 = sentence_bleu([trim_target], trim_predict, weights=(1, 0, 0, 0),smoothing_function=SmoothingFunction().method7)
-
-        except:
-            BLEUscore1 = 0
-        try:
-            BLEUscore2 = sentence_bleu([trim_target], trim_predict, weights=(0.5, 0.5, 0, 0),smoothing_function=SmoothingFunction().method7)
-
-        except:
-            BLEUscore2 = 0
-        try:
-            BLEUscore3 = sentence_bleu([trim_target], trim_predict, weights=(0.33, 0.33, 0.33, 0),smoothing_function=SmoothingFunction().method7)
-
-        except:
-            BLEUscore3 = 0
-        try:
-            BLEUscore4 = sentence_bleu([trim_target], trim_predict, weights=(0.25, 0.25, 0.25, 0.25),smoothing_function=SmoothingFunction().method7)
-        except:
-            BLEUscore4 = 0
-        s1.append(BLEUscore1)
-        s2.append(BLEUscore2)
-        s3.append(BLEUscore3)
-        s4.append(BLEUscore4)
-    return [np.mean(s1),np.mean(s2),np.mean(s3),np.mean(s4)]
-
-def cherry_pick(input_batch, target_batch, predict_batch, token2str, top=5):
-    all_scores=[]
-    all_in=[]
-    all_out=[]
-    all_pred=[]
-    for b in range(target_batch.shape[0]):
-        trim_target = []
-        trim_predict = []
-        str_target = []
-        str_predict = []
-        str_input=[]
-        for t in target_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_target.append(t)
-                str_target.append(token2str[t])
-        for t in predict_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_predict.append(t)
-                str_predict.append(token2str[t])
-        for t in input_batch[b]:
-            if t > 2:
-                str_input.append(token2str[t])
-        all_in.append(str_input)
-        all_out.append(str_target)
-        all_pred.append(str_predict)
-        try:
-            BLEUscore4 = sentence_bleu([trim_target], trim_predict, weights=(0.25, 0.25, 0.25, 0.25),smoothing_function=SmoothingFunction().method7)
-        except:
-            BLEUscore4 = 0
-        all_scores.append(BLEUscore4)
-    alls = np.asarray(all_scores)
-    mind=alls.argsort()[::-1][:top]
-    res_in = []
-    res_out = []
-    res_pred = []
-    res_score = []
-    for ind in mind:
-        res_in.append(all_in[ind])
-        res_out.append(all_out[ind])
-        res_pred.append(all_pred[ind])
-        res_score.append(all_scores[ind])
-    return res_in, res_out, res_pred, res_score
-
-
-
-
-def distinct_score(input_batch, target_batch, predict_batch, token2str, print_prob=0.9995):
-    s1=[]
-    s2=[]
-    s3=0
-    for b in range(target_batch.shape[0]):
-        trim_target = []
-        trim_predict = []
-        str_target = []
-        str_predict = []
-        str_input=[]
-        for t in target_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_target.append(t)
-                str_target.append(token2str[t])
-        for t in predict_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_predict.append(t)
-                str_predict.append(token2str[t])
-        if np.random.rand()>print_prob:
-            for t in input_batch[b]:
-                if t > 2:
-                    str_input.append(token2str[t])
-            print('{}-->{} vs {}'.format(str_input, str_target, str_predict))
-
-        set_d1 = set(str_predict)
-        set_d2=[]
-        for b1,b2 in zip(str_predict[:-1], str_predict[1:]):
-            set_d2.append(b1+b2)
-        set_d2 = set(set_d2)
-        s1+=list(set_d1)
-        s2+=list(set_d2)
-        s3+=len(str_predict)
-    return [list(set(s1)),list(set(s2)),s3]
-
-
-cachedStopWords = stopwords.words("english")
-
-def bow_score(input_batch, target_batch, predict_batch, token2str, mat=None):
-    s1=[]
-    for b in range(target_batch.shape[0]):
-        trim_target = []
-        trim_predict = []
-        str_target = []
-        str_predict = []
-        str_input=[]
-        if mat is None:
-            oh1=np.zeros(len(token2str))
-            oh2 = np.zeros(len(token2str))
-        else:
-            oh1 = np.zeros(mat.shape[1])
-            oh2 = np.zeros(mat.shape[1])
-        for t in target_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_target.append(t)
-                if token2str[t] not in cachedStopWords:
-                    if mat is None:
-                        oh1+=onehot(t, len(token2str))
-                    else:
-                        oh1+=mat[t]
-                str_target.append(token2str[t])
-        for t in predict_batch[b]:
-            if t >2 and token2str[t]!='.':
-                trim_predict.append(t)
-                if token2str[t] not in cachedStopWords:
-                    if mat is None:
-                        oh2+=onehot(t, len(token2str))
-                    else:
-                        oh2+=mat[t]
-                str_predict.append(token2str[t])
-
-        s1.append(cosine_similarity(np.reshape(oh1,[1,-1]),np.reshape(oh2,[1,-1])))
-
-    return np.mean(s1)
 
 def llprint(message):
     sys.stdout.write(message)
@@ -230,6 +26,10 @@ def onehot(index, size):
     vec = np.zeros(size, dtype=np.float32)
     vec[int(index)] = 1.0
     return vec
+
+
+def metric_score(brin,brout,bout_list, tok2str):
+
 
 def prepare_sample_batch(diag_list,word_space_size_input,word_space_size_output, bs):
     if isinstance(bs, int):
@@ -300,26 +100,7 @@ def prepare_sample_batch(diag_list,word_space_size_input,word_space_size_output,
     # raise False
     return np.asarray(input_vecs), np.asarray(output_vecs), seq_len, decoder_length, np.asarray(masks), out_list, in_list
 
-EN_WHITELIST = '.?!0123456789abcdefghijklmnopqrstuvwxyz '  # space is included in whitelist
 
-def load_lines_from_file(fpath, str2tok):
-    all_sens=[]
-    with open(fpath) as f:
-        for line in f:
-            sen=[]
-            line = ''.join([ch if ch in EN_WHITELIST else ' ' for ch in line.lower()])
-            tokens = nltk.word_tokenize(line)
-            for tok in tokens:
-                if tok in str2tok:
-                    sen.append(str2tok[tok])
-                else:
-                    sen.append(str2tok['<unknown>'])
-            all_sens.append([sen,[1]*10])
-    # print(all_sens)
-    # raise False
-    return all_sens
-
-SAMPLED_SOFTMAX = 0
 
 def single_qa_task(args):
     dirname = os.path.dirname(os.path.abspath(__file__)) + '/data/save/'
@@ -436,14 +217,11 @@ def single_qa_task(args):
 
             start = 1 if start_step == 0 else start_step + 1
             end = start_step + iterations + 1
-            if args.mode == 'test' or args.mode=='cherry_pick':
+            if args.mode == 'test':
                 start=0
                 end = start
                 dialogs_list_valid = dialogs_list_test
-            elif args.mode == 'test_file':
-                start = 0
-                end = start
-                dialogs_list_valid = load_lines_from_file(args.test_file, str2tok)
+
 
             start_time_100 = time.time()
 
@@ -575,73 +353,12 @@ def single_qa_task(args):
                                                                             stop_char=2)
                                 bout_list.append(out_list)
                             tescores.append(bleu_score(np.asarray(rin_list)[:rs], np.asarray(rout_list)[:rs], np.asarray(bout_list)[:rs], tok2str))
-                            if args.mode == 'test':
-                                tescores4.append(bleu_score4(np.asarray(rin_list)[:rs], np.asarray(rout_list)[:rs],
-                                                                               np.asarray(bout_list)[:rs], tok2str, print_prob=0.8))
-                                distinct2.append(distinct_score(np.asarray(rin_list)[:rs],
-                                                                                  np.asarray(rout_list)[:rs],
-                                                                                  np.asarray(bout_list)[:rs], tok2str))
-
-                            elif args.mode=='cherry_pick':
-                                res_in, res_out, res_pred, res_score =cherry_pick(np.asarray(rin_list)[:rs],
-                                                                                  np.asarray(rout_list)[:rs],
-                                                                                  np.asarray(bout_list)[:rs], tok2str)
-                                all_res_in.extend(res_in)
-                                all_res_out.extend(res_out)
-                                all_res_pred.extend(res_pred)
-                                all_res_score.extend(res_score)
 
 
-                            all_out+=bout_list[:rs]
-                            all_label+=rout_list[:rs]
-
-                        if args.mode == 'test_file':
-                            print('some predic')
-                            print(len(all_out))
-                            print(len(all_label))
-                            for tt, tv in enumerate(all_out[:100]):
-                                # print('{} vs {}'.format(dialogs_list_valid[tt][0], all_out[tt]))
-                                str1=''
-                                str1r=''
-                                for c in dialogs_list_valid[tt][0]:
-                                    str1+=tok2str[c]+' '
-                                for c in dialogs_list_valid[tt][1]:
-                                    if c>2:
-                                        str1r+=tok2str[c]+' '
-                                str2 = ''
-                                for c in all_out[tt]:
-                                    str2 += tok2str[c] + ' '
-                                print('{} --> {} vs {}'.format(str1,str1r, str2))
-                                print('---')
-                        elif args.mode == 'cherry_pick':
-                            print('=======================')
-                            alls = np.asarray(all_res_score)
-                            mind = alls.argsort()[::-1][:10]
-                            for indd in mind:
-                                print('{} --> {} vs {} with score {}'.format(all_res_in[indd],all_res_out[indd],
-                                                                             all_res_pred[indd],all_res_score[indd]))
 
                         tloss=np.mean(losses)
                         tpre=np.mean(tescores)
                         print('tr score {} vs te store {}'.format(np.mean(trscores),np.mean(tescores)))
-                        if args.mode=='test':
-                            tescores4 = np.asarray(tescores4)
-                            distinct2 = np.asarray(distinct2)
-                            te4 = np.mean(tescores4, axis=0)
-                            d1 = []
-                            d2 = []
-                            n = 0
-                            for r in distinct2:
-                                d1 += r[0]
-                                d2 += r[1]
-                                n += r[2]
-                            d1 = len(set(d1)) / n
-                            d2 = len(set(d2)) / n
-                            print('4 bleu')
-                            print(te4)
-                            print('2 distinct')
-                            print(d1, d2)
-                            print(np.mean(bows))
                         print('test loss {}'.format(tloss))
                         if args.mode=='train':
                             summary.value.add(tag='train_acc', simple_value=np.mean(trscores))
@@ -727,8 +444,7 @@ if __name__ == '__main__':
     # args.task = 'cornell20_x2'
 
     print(args)
-    if args.sampled_loss_dim > 0:
-        SAMPLED_SOFTMAX = 1
+
 
 
     single_qa_task(args)
