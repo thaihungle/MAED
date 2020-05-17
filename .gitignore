@@ -70,5 +70,3 @@ ENV/
 .DS_Store
 
 .idea
-busi_task/data/log_bpi
-busi_task/data/checkpoints_bpi_mix
