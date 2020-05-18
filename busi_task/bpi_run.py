@@ -321,9 +321,9 @@ def load_single_sequence(fname):
 
 
 def load_np_data(dir):
-    X=pickle.load(open(dir+'/ps_X.pkl','rb'),encoding='latin1')
-    y_a = pickle.load(open(dir + '/ps_ya.pkl','rb'),encoding='latin1')
-    y_t = pickle.load(open(dir + '/ps_yt.pkl','rb'),encoding='latin1')
+    X=pickle.load(open(dir+'/ps_Xsmall.pkl','rb'),encoding='latin1')
+    y_a = pickle.load(open(dir + '/ps_yasmall.pkl','rb'),encoding='latin1')
+    y_t = pickle.load(open(dir + '/ps_ytsmall.pkl','rb'),encoding='latin1')
 
     return X, y_a, y_t
 
